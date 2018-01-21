@@ -282,7 +282,7 @@ abstract class Node {
     // all nodes need data, parent, and a capacity
     protected Vector<DataNode> data;
     protected Node parent;
-    protected int maxsize;
+    protected int f;
 
     public boolean isLeafNode() {
         // determine if a node is a leafnode...
@@ -592,7 +592,6 @@ class TreeNode extends Node {
 
     Node insert(DataNode dnode) {
         Node next = this.getPointerTo(dnode);
-
         return next.insert(dnode);
     }
 }
