@@ -43,13 +43,6 @@ public class FinalProject {
     public static String parent = "0";
     public static String next = "0";
 
-    public static boolean dNodeInserted = false;
-    public static String lowLine;
-    public static String highLine;
-    public static String finalPointerToNextPage;
-    public static boolean finalPointerToNextPageCalculated = false;
-    public static boolean isDuplicateKey = false;
-
     public static String dataToBeInserted;
     public static String dataKeyToBeInserted;
 
@@ -79,10 +72,10 @@ public class FinalProject {
         str = bfr.readLine();
         String[] values = str.split(",");
         currNode = root;
+        currentSize = values[3];
+        parent = values[4];
+        next = values[5];
         if (values[1].equals("1")) {
-            currentSize = values[3];
-            parent = values[4];
-            next = values[5];
             insertIntoLeafNode(bfr);
         } else {
             insertIntoNonLeafNode();
@@ -153,6 +146,7 @@ public class FinalProject {
         } else {
             finalFile = "" + -1 + "," + 1 + "," + degreeOfTree + splitlocation + "," + parent + "," + FinalProject.currNode + "right" + "\n";
             path = new Path(newFolderPath + "/" + FinalProject.currNode + "right.txt");
+            next = FinalProject.currNode + "right";
         }
         String line = bfr.readLine();
         String[] v = line.split(",");
@@ -201,6 +195,7 @@ public class FinalProject {
                 secondfFile = secondfFile + i + "," + dataKeyToBeInserted + "," + dataToBeInserted + "\n";
             }
         }
+
         Path thisFile = new Path(newFolderPath + "/" + currNode + ".txt");
         hdfs.delete(thisFile, true);
         hdfs.createNewFile(thisFile);
@@ -219,18 +214,20 @@ public class FinalProject {
         FSDataOutputStream fssOutStream = hdfs.create(path);
         fssOutStream.write(bbyt);
         fssOutStream.close();
+
         propogate(String.valueOf(midData));
     }
 
     private static void propogate(String midData) throws IOException {
 
-        if (parent.equals("0")) {
+        if (parent.equals("0")) {//if parent is not present....create a new tree node and set it as root
             Path path = new Path(newFolderPath + "/" + currNode + "parent.txt");
-
             root = currNode + "parent";
             parent = "0";
-            String string = "-1,0," + degreeOfTree + ",1,0\n" + "0," + currNode + "\n";
-            string = string + "1," + midData + "," + s + "\n";
+            currNode = root;
+            String string = "-1,0," + degreeOfTree + ",1,0" + "\n";//TODO:check here..
+            string = string + "0" + "," + currNode + "\n";
+            string = string + "1," + midData + "," + next + "\n";
             hdfs.delete(path, true);
             hdfs.createNewFile(path);
             StringBuilder sb = new StringBuilder();
@@ -241,47 +238,141 @@ public class FinalProject {
             fssOutStream.close();
         } else {
             Path path = new Path(newFolderPath + "/" + parent + ".txt");
-            FileSystem fileSystem = FileSystem.get(new Configuration());
-            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(fileSystem.open(path)));
+            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(hdfs.open(path)));
             String line = bufferedReader.readLine();
             String[] v = line.split(",");
-            if (Integer.parseInt(v[3]) < degreeOfTree) {
+            int sizeOfParent = Integer.parseInt(v[3]);
+            currNode = parent;
+            parent = v[4];
+            if (sizeOfParent < degreeOfTree-1) {
                 String finalFile = "";
-                fileSystem = FileSystem.get(new Configuration());
-                bufferedReader = new BufferedReader(new InputStreamReader(fileSystem.open(path)));
+                int newSize =  sizeOfParent +1;
+                finalFile = "-1,0,"+degreeOfTree +","+newSize+","+parent + "\n";
                 line = bufferedReader.readLine();
-                v = line.split(",");
-                //check the size of parent is write or wrong...
-                int sizeOfParent = Integer.parseInt(v[4]);
+                finalFile = finalFile + line +"\n";//zeroth line is copied as it is...
                 line = bufferedReader.readLine();
-
-                for (int i = 1; i <= Integer.parseInt(lowLine) && line != null; i++) {
+                int i;
+                for (i = 1; i <= sizeOfParent && line != null && Integer.parseInt(midData) > Integer.parseInt(v[1]); i++) {
                     finalFile = finalFile + line + "\n";
                     line = bufferedReader.readLine();
-                }
-                int lineNo = Integer.parseInt(lowLine) + 1;
-                finalFile = finalFile + "" + lineNo + "," + midData + "," + s + "\n";
-                for (int i = Integer.parseInt(highLine); (i < (sizeOfParent) + 1) && line != null; i++) {
                     v = line.split(",");
-                    lineNo = Integer.parseInt(v[0]) + 1;
-                    finalFile = finalFile + lineNo + "," + v[1] + "," + v[2] + "\n";
-                    line = bufferedReader.readLine();
                 }
-            } else {
+                if(i <= sizeOfParent){
+                    finalFile = finalFile + i + "," + midData + "," + next + "\n";
+                    i++;
+                    for (; i <= sizeOfParent && line != null; i++) {
+                        v = line.split(",");
+                        finalFile = finalFile + i + "," + v[1] + "," + v[2] + "\n";
+                        line = bufferedReader.readLine();
+                    }
+                }else if(i==sizeOfParent+1){
+                    finalFile = finalFile + i + "," + midData + "," + next + "\n";
+                }
+                hdfs.delete(path, true);
+                hdfs.createNewFile(path);
+                StringBuilder sb = new StringBuilder();
+                sb.append(finalFile);
+                byte[] bbyt = sb.toString().getBytes();
+                FSDataOutputStream fssOutStream = hdfs.create(path);
+                fssOutStream.write(bbyt);
+                fssOutStream.close();
                 currNode = parent;
-                splitTreeNode(midData);
+            } else {
+               splitTreeNode(midData,line,bufferedReader,v);
             }
         }
     }
 
-    private static void splitTreeNode(String midData) {
-        int splitlocation, insertlocation = 0;
-        if (degreeOfTree % 2 == 0) {
-            splitlocation = degreeOfTree / 2;
+    private static void splitTreeNode(String midData, String line, BufferedReader bufferedReader, String[] v) throws IOException {
+
+        String finalFile = "",secondFile = "";
+        String newMidData = "";
+        String firstPointerForSecondFile;
+        int splitlocation;
+        if ((degreeOfTree - 1) % 2 == 0) {
+            splitlocation = (degreeOfTree - 1) / 2;
         } else {
-            splitlocation = (degreeOfTree + 1) / 2 - 1;
+            splitlocation = ((degreeOfTree - 1) + 1) / 2;
         }
-        boolean dnodeinserted = false;
+        //TODO:cross check here....
+        int sizeOfSecondTree = Integer.parseInt(FinalProject.currentSize) - splitlocation;
+
+        finalFile = "-1,0" + degreeOfTree +","+ splitlocation +","+ parent;
+        line = bufferedReader.readLine();
+        finalFile = finalFile + line +"\n";//zeroth line is copied as it is...
+        secondFile = secondFile + "-1,0," +sizeOfSecondTree + ","+parent+"\n";
+        line = bufferedReader.readLine();
+        int i;
+        firstPointerForSecondFile = "";//TODO:check here...
+        for (i = 1; i <= splitlocation && line != null && Integer.parseInt(midData) > Integer.parseInt(v[1]); i++) {
+            finalFile = finalFile + line + "\n";
+            firstPointerForSecondFile = v[2];
+            line = bufferedReader.readLine();
+            v = line.split(",");
+        }
+        if(i <= splitlocation){
+            finalFile = finalFile + i + "," + midData + "," + next + "\n";
+            i++;
+            for (; i <= splitlocation && line != null; i++) {
+                v = line.split(",");
+                finalFile = finalFile + i + "," + v[1] + "," + v[2] + "\n";
+                firstPointerForSecondFile = v[2];
+                line = bufferedReader.readLine();
+            }
+            v= line.split(",");
+            secondFile = "0," + firstPointerForSecondFile + "\n";
+            i++;
+            newMidData = (v[1]);
+            for (; i < Integer.parseInt(currentSize) + 1; i++) {
+                int lineNo = i - splitlocation;
+                v = line.split(",");
+                secondFile = secondFile + lineNo + "," + v[1]+"," + v[2]+ "\n";
+                line = bufferedReader.readLine();
+            }
+        } else{
+            v = line.split(",");
+            newMidData = (v[1]);
+            secondFile = "0," + firstPointerForSecondFile + "\n";
+            for (; (i < Integer.parseInt(currentSize) + 1) && Integer.parseInt(midData) > Integer.parseInt(v[1]); i++) {
+                int lineNo = i - splitlocation;
+                v = line.split(",");
+                secondFile = secondFile + lineNo + "," + v[1] + "," + v[2] + "\n";
+                line = bufferedReader.readLine();
+            }
+            if (i < Integer.parseInt(currentSize) + 1) {
+                secondFile = secondFile + i + "," + midData + "," + next + "\n";
+                i++;
+                for (; i < Integer.parseInt(currentSize) + 1; i++) {
+                    int lineNo = i - splitlocation;
+                    secondFile = secondFile + lineNo + "," + v[1] + "," + v[2] + "\n";
+                    line = bufferedReader.readLine();
+                }
+            } else {
+                secondFile = secondFile + i + "," + midData + "," + next + "\n";
+            }
+        }
+
+        Path thisFile = new Path(newFolderPath + "/" + currNode + ".txt");
+        hdfs.delete(thisFile, true);
+        hdfs.createNewFile(thisFile);
+        StringBuilder sb = new StringBuilder();
+        sb.append(finalFile);
+        byte[] byt = sb.toString().getBytes();
+        FSDataOutputStream fsOutStream = hdfs.create(thisFile);
+        fsOutStream.write(byt);
+        fsOutStream.close();
+
+        Path path = new Path(newFolderPath + "/" + currNode+parent + "right.txt");
+        hdfs.delete(path, true);
+        hdfs.createNewFile(path);
+        sb = new StringBuilder();
+        sb.append(secondFile);
+        byte[] bbyt = sb.toString().getBytes();
+        FSDataOutputStream fssOutStream = hdfs.create(path);
+        fssOutStream.write(bbyt);
+        fssOutStream.close();
+        next = currNode + parent + "right";
+        propogate(String.valueOf(newMidData));
 
     }
 
