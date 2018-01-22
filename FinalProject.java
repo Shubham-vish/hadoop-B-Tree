@@ -78,13 +78,40 @@ public class FinalProject {
         if (values[1].equals("1")) {
             insertIntoLeafNode(bfr);
         } else {
-            insertIntoNonLeafNode();
+            insertIntoNonLeafNode(bfr);
         }
     }
 
-    private static void insertIntoNonLeafNode() {
+    private static void insertIntoNonLeafNode(BufferedReader bfr) throws IOException {
+        int i;
+        String line = bfr.readLine();
+        String[] v =line.split(",");
+        String leftPointer = v[1];
+        line = bfr.readLine();
+            for (i = 1; i <= Integer.parseInt(currentSize) && line != null && Integer.parseInt(v[1]) > Integer.parseInt(dataKeyToBeInserted); i++) {
+                line = bfr.readLine();
+                v = line.split(",");
+                leftPointer = v[2];
+            }
+        hdfs = FileSystem.get(jobConf);
+        Path newFilePath = new Path(newFolderPath + "/" + leftPointer + ".txt");
+        bfr = new BufferedReader(new InputStreamReader(hdfs.open(newFilePath)));
+        String str;
+        str = bfr.readLine();
+        String[] values = str.split(",");
+        currNode = root;
+        currentSize = values[3];
+        parent = values[4];
+        next = values[5];
+        if (values[1].equals("1")) {
+            insertIntoLeafNode(bfr);
+        } else {
+            insertIntoNonLeafNode(bfr);
+        }
 
-    }
+        }
+
+
 
     private static void insertIntoLeafNode(BufferedReader bfr) throws IOException {
         if (Integer.parseInt(currentSize) < degreeOfTree - 1) {
