@@ -57,13 +57,36 @@ public class FinalProject {
         Scanner reader = new Scanner(System.in);
         degreeOfTree = reader.nextInt();
         System.out.println("you've enetered: " + degreeOfTree);
+        int numberofValues;
+        reader = new Scanner(System.in);
+        numberofValues = reader.nextInt();
+        for(int i=0;i<numberofValues;i++){
+            System.out.println("Enter Data: ");
+            reader = new Scanner(System.in);
+            dataKeyToBeInserted = reader.next();
+            System.out.println("Enter DataString: ");
+            reader = new Scanner(System.in);
+            dataToBeInserted = reader.next();
+            insertIntoTree();
+            System.out.println("File:");
+            hdfs = FileSystem.get(jobConf);
+            Path newFilePath = new Path(newFolderPath + "/" + currNode + ".txt");
+            BufferedReader bfr = new BufferedReader(new InputStreamReader(hdfs.open(newFilePath)));
+            String str;
+            str = bfr.readLine();
+            while ( str!= null){
+                System.out.println(str);
+                str = bfr.readLine();
+            }
+        }
+
         reader.close();
-        insertIntoTree();
     }
 
     private static void insertIntoTree() throws IOException {
         if (root.equals("0")) {
             createTree();
+            System.out.println("created tree...." + currNode + "," + parent +"," +currentSize + "," + next);
         }
         hdfs = FileSystem.get(jobConf);
         Path newFilePath = new Path(newFolderPath + "/" + root + ".txt");
@@ -74,8 +97,8 @@ public class FinalProject {
         currNode = root;
         currentSize = values[3];
         parent = values[4];
-        next = values[5];
         if (values[1].equals("1")) {
+            next = values[5];
             insertIntoLeafNode(bfr);
         } else {
             insertIntoNonLeafNode(bfr);
@@ -85,6 +108,7 @@ public class FinalProject {
     private static void insertIntoNonLeafNode(BufferedReader bfr) throws IOException {
         int i;
         String line = bfr.readLine();
+
         String[] v =line.split(",");
         String leftPointer = v[1];
         line = bfr.readLine();
@@ -114,26 +138,33 @@ public class FinalProject {
 
 
     private static void insertIntoLeafNode(BufferedReader bfr) throws IOException {
-        if (Integer.parseInt(currentSize) < degreeOfTree - 1) {
+
+        System.out.println("inside insert into LeafNode...." + currNode + "," + parent +"," +currentSize + "," + next);
+
+        if (Integer.parseInt(currentSize) < degreeOfTree - 1 && Integer.parseInt(currentSize)!=0) {
+            System.out.println("currentSize < degree" + currNode + "," + parent +"," +currentSize + "," + next);
             String finalFile = "";
-            int currSize = Integer.parseInt(currentSize) + 1;
-            finalFile = finalFile + -1 + ",1," + degreeOfTree + currSize + "," + parent + "," + next + "\n";
+            int currSize = Integer.parseInt(currentSize)+1;
+            finalFile = finalFile + -1 + ",1," + degreeOfTree +"," +currSize + "," + parent + "," + next + "\n";
             String line = bfr.readLine();
             String[] v = line.split(",");
             int data = Integer.parseInt(v[1]);
             int i;
-            for (i = 0; i < currSize && data < Integer.parseInt(dataKeyToBeInserted); i++) {
+            for (i = 0; i < currSize-1 && data < Integer.parseInt(dataKeyToBeInserted); i++) {
                 finalFile = finalFile + line + "\n";
                 line = bfr.readLine();
-                v = line.split(",");
-                data = Integer.parseInt(v[1]);
+                if(line!=null) {
+                    v = line.split(",");
+                    data = Integer.parseInt(v[1]);
+                }
             }
-            if (i >= currSize) {
-
+            if (i == currSize-1) {
+                finalFile = finalFile + i + "," + dataKeyToBeInserted + "," + dataToBeInserted + "\n";
+                i++;
             } else {
                 finalFile = finalFile + i + "," + dataKeyToBeInserted + "," + dataToBeInserted + "\n";
                 i++;
-                for (; i < currSize; i++) {
+                for (; i <= currSize-1; i++) {
                     v = line.split(",");
                     finalFile = finalFile + i + "," + v[1] + "," + v[2] + "\n";
                     line = bfr.readLine();
@@ -148,7 +179,21 @@ public class FinalProject {
             FSDataOutputStream fsOutStream = hdfs.create(newFilePath);
             fsOutStream.write(byt);
             fsOutStream.close();
-        } else {
+        }else if(Integer.parseInt(currentSize) == 0){
+            int currSize = Integer.parseInt(currentSize) + 1;
+            String finalFile = "" + -1 + ",1," + degreeOfTree + ","+currSize + "," + parent + "," + next + "\n";
+            finalFile = finalFile + "0" + "," + dataKeyToBeInserted + "," + dataToBeInserted + "\n";
+            Path newFilePath = new Path(newFolderPath + "/" + currNode + ".txt");
+            hdfs.delete(newFilePath, true);
+            hdfs.createNewFile(newFilePath);
+            StringBuilder sb = new StringBuilder();
+            sb.append(finalFile);
+            byte[] byt = sb.toString().getBytes();
+            FSDataOutputStream fsOutStream = hdfs.create(newFilePath);
+            fsOutStream.write(byt);
+            fsOutStream.close();
+        }
+        else {
             splitLeaf(bfr);
         }
     }
@@ -161,17 +206,23 @@ public class FinalProject {
         } else {
             splitlocation = ((degreeOfTree - 1) + 1) / 2;
         }
+
         Path path;
         int sizeOfSecondTree = 0;
         sizeOfSecondTree = Integer.parseInt(FinalProject.currentSize) - splitlocation;
+        System.out.println("split leaf....split location,size of second tree = "+splitlocation +","+sizeOfSecondTree+ currNode + "," + parent +"," +currentSize + "," + next);
+
         String finalFile = "";
         String secondfFile = "-1,1," + degreeOfTree + "," + sizeOfSecondTree + "," + FinalProject.parent + FinalProject.next + "\n";
         if (!next.equals("0")) {
+            System.out.println("split leaf nex ! = 0...." + currNode + "," + parent +"," +currentSize + "," + next);
             path = new Path(newFolderPath + "/" + FinalProject.next + "left.txt");
-            finalFile = "" + -1 + "," + 1 + "," + degreeOfTree + splitlocation + "," + parent + "," + FinalProject.next + "left" + "\n";
+            finalFile = "" + -1 + "," + 1 + "," + degreeOfTree +","+ splitlocation + "," + parent + "," + FinalProject.next + "left" + "\n";
             next = FinalProject.next + "left";
         } else {
-            finalFile = "" + -1 + "," + 1 + "," + degreeOfTree + splitlocation + "," + parent + "," + FinalProject.currNode + "right" + "\n";
+            System.out.println("split leaf nex = = 0...." + currNode + "," + parent +"," +currentSize + "," + next);
+
+            finalFile = "" + -1 + "," + 1 + "," + degreeOfTree +","+ splitlocation + "," + parent + "," + FinalProject.currNode + "right" + "\n";
             path = new Path(newFolderPath + "/" + FinalProject.currNode + "right.txt");
             next = FinalProject.currNode + "right";
         }
@@ -179,7 +230,7 @@ public class FinalProject {
         String[] v = line.split(",");
         int data = Integer.parseInt(v[1]);
         int i;
-        for (i = 0; i < splitlocation && line != null && data < Integer.parseInt(dataKeyToBeInserted); i++) {
+        for (i = 0; i < splitlocation-1 && line != null && data < Integer.parseInt(dataKeyToBeInserted); i++) {
             finalFile = finalFile + line + "\n";
             line = bfr.readLine();
             v = line.split(",");
@@ -189,34 +240,36 @@ public class FinalProject {
             finalFile = finalFile + i + "," + dataKeyToBeInserted + "," + dataToBeInserted + "\n";
             i++;
             for (; i < splitlocation; i++) {
-                v = line.split(",");
                 finalFile = finalFile + i + "," + v[1] + "," + v[2] + "\n";
                 line = bfr.readLine();
+                v = line.split(",");
             }
-            v = line.split(",");
             midData = Integer.parseInt(v[1]);
             for (; i < Integer.parseInt(currentSize) + 1; i++) {
                 int lineNo = i - splitlocation;
-                v = line.split(",");
                 secondfFile = secondfFile + lineNo + "," + v[1] + "," + v[2] + "\n";
                 line = bfr.readLine();
+                if(line!=null)
+                v = line.split(",");
             }
         } else {
-            v = line.split(",");
             midData = Integer.parseInt(v[1]);
-            for (; (i < Integer.parseInt(currentSize) + 1) && data < Integer.parseInt(dataKeyToBeInserted); i++) {
+            for (; (i < Integer.parseInt(currentSize)) && data < Integer.parseInt(dataKeyToBeInserted); i++) {
                 int lineNo = i - splitlocation;
-                v = line.split(",");
                 secondfFile = secondfFile + lineNo + "," + v[1] + "," + v[2] + "\n";
                 line = bfr.readLine();
+                if(line!=null)
+                v = line.split(",");
             }
-            if (i < Integer.parseInt(currentSize) + 1) {
+            if (i < Integer.parseInt(currentSize)) {
                 secondfFile = secondfFile + i + "," + dataKeyToBeInserted + "," + dataToBeInserted + "\n";
                 i++;
                 for (; i < Integer.parseInt(currentSize) + 1; i++) {
                     int lineNo = i - splitlocation;
                     secondfFile = secondfFile + lineNo + "," + v[1] + "," + v[2] + "\n";
                     line = bfr.readLine();
+                    if(line!=null)
+                        v = line.split(",");
                 }
             } else {
                 secondfFile = secondfFile + i + "," + dataKeyToBeInserted + "," + dataToBeInserted + "\n";
@@ -247,7 +300,11 @@ public class FinalProject {
 
     private static void propogate(String midData) throws IOException {
 
+        System.out.println("propogate....midData="+midData + "," + currNode + "," + parent +"," +currentSize + "," + next);
+
         if (parent.equals("0")) {//if parent is not present....create a new tree node and set it as root
+            System.out.println("propogate..creatoing parent..midData="+midData + "," + currNode + "," + parent +"," +currentSize + "," + next);
+
             Path path = new Path(newFolderPath + "/" + currNode + "parent.txt");
             root = currNode + "parent";
             parent = "0";
@@ -264,6 +321,8 @@ public class FinalProject {
             fssOutStream.write(bbyt);
             fssOutStream.close();
         } else {
+            System.out.println("propogate...parent already present.midData="+midData + "," + currNode + "," + parent +"," +currentSize + "," + next);
+
             Path path = new Path(newFolderPath + "/" + parent + ".txt");
             BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(hdfs.open(path)));
             String line = bufferedReader.readLine();
@@ -272,6 +331,8 @@ public class FinalProject {
             currNode = parent;
             parent = v[4];
             if (sizeOfParent < degreeOfTree-1) {
+                System.out.println("propogate...sizeOfPArent < degree.midData="+midData + "," + currNode + "," + parent +"," +currentSize + "," + next);
+
                 String finalFile = "";
                 int newSize =  sizeOfParent +1;
                 finalFile = "-1,0,"+degreeOfTree +","+newSize+","+parent + "\n";
@@ -311,6 +372,8 @@ public class FinalProject {
     }
 
     private static void splitTreeNode(String midData, String line, BufferedReader bufferedReader, String[] v) throws IOException {
+
+        System.out.println("split Tree Node" + "," + currNode + "," + parent +"," +currentSize + "," + next);
 
         String finalFile = "",secondFile = "";
         String newMidData = "";
@@ -405,6 +468,8 @@ public class FinalProject {
 
 
     private static void createTree() throws IOException {
+        System.out.println("inside create tree" + "," + currNode + "," + parent +"," +currentSize + "," + next);
+
         jobConf = new JobConf(FinalProject.class);
         workingDir = hdfs.getWorkingDirectory();
         newFolderPath = new Path(workingDir, "Tree");
