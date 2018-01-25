@@ -110,13 +110,13 @@ public class FinalProject {
 
     private static void insertIntoNonLeafNode(BufferedReader bfr) throws IOException {
         int i;
-        String line = bfr.readLine();
+        String line = bfr.readLine();//zeroth line is rea here....
         System.out.println("inserting into non leaf node line 114 : currentNode, root : " +currNode+ ", "+root );
         String[] v =line.split(",");
-        String leftPointer = v[1];
-        line = bfr.readLine();
+        String leftPointer = v[1];//leftest pointer..
+        line = bfr.readLine();//first line read here....
          v =line.split(",");
-            for (i = 1; i <= Integer.parseInt(currentSize) && line != null && Integer.parseInt(v[1]) > Integer.parseInt(dataKeyToBeInserted); i++) {
+            for (i = 1; i <= Integer.parseInt(currentSize) && line != null && Integer.parseInt(v[1]) < Integer.parseInt(dataKeyToBeInserted); i++) {
                 leftPointer = v[2];
                 line = bfr.readLine();
                 if(line!=null)
@@ -132,8 +132,9 @@ public class FinalProject {
         currNode = leftPointer;
         currentSize = values[3];
         parent = values[4];
-        next = values[5];
+
         if (values[1].equals("1")) {
+            next = values[5];
             insertIntoLeafNode(bfr);
         } else {
             insertIntoNonLeafNode(bfr);
@@ -234,7 +235,7 @@ public class FinalProject {
             path = new Path(newFolderPath + "/" + nodeCount + ".txt");
             next = "" + nodeCount;
         }
-        String line = bfr.readLine();
+        String line = bfr.readLine();//zeroth line rea here....
         String[] v = line.split(",");
         int data = Integer.parseInt(v[1]);
         int i;
@@ -264,6 +265,9 @@ public class FinalProject {
             }
         } else {
             midData = Integer.parseInt(v[1]);
+            if(midData>Integer.parseInt(dataKeyToBeInserted)){
+                midData = Integer.parseInt(dataKeyToBeInserted);
+            }
             for (; (i < maxSize-1 && data < Integer.parseInt(dataKeyToBeInserted) ); i++) {
                 int lineNo = i - splitlocation;
                 secondfFile = secondfFile + lineNo + "," + v[1] + "," + v[2] + "\n";
@@ -283,7 +287,8 @@ public class FinalProject {
                         v = line.split(",");
                 }
             } else {
-                secondfFile = secondfFile + i + "," + dataKeyToBeInserted + "," + dataToBeInserted + "\n";
+                int lineNo = i-splitlocation;
+                secondfFile = secondfFile + lineNo + "," + dataKeyToBeInserted + "," + dataToBeInserted + "\n";
             }
         }
 
@@ -339,7 +344,6 @@ public class FinalProject {
             return;
         } else {
             System.out.println("propogate...parent already present.midData="+midData + "," + currNode + "," + parent +"," +currentSize + "," + next);
-
             Path path = new Path(newFolderPath + "/" + parent + ".txt");
             BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(hdfs.open(path)));
             String line = bufferedReader.readLine();
@@ -347,6 +351,7 @@ public class FinalProject {
             int sizeOfParent = Integer.parseInt(v[3]);
             currNode = parent;
             parent = v[4];
+            currentSize = String.valueOf(sizeOfParent);
             if (sizeOfParent < degreeOfTree-1) {
                 System.out.println("propogate...sizeOfPArent < degree.midData="+midData + "," + currNode + "," + parent +"," +currentSize + "," + next);
 
@@ -355,25 +360,29 @@ public class FinalProject {
                 finalFile = "-1,0,"+degreeOfTree +","+newSize+","+parent + "\n";
                 line = bufferedReader.readLine();
                 finalFile = finalFile + line +"\n";//zeroth line is copied as it is...
-                line = bufferedReader.readLine();
+                line = bufferedReader.readLine();//first line read here...
                 v = line.split(",");
                 int i;
-                for (i = 1; i <= sizeOfParent && line != null && Integer.parseInt(midData) > Integer.parseInt(v[1]); i++) {
+                for (i = 1; i < newSize && line != null && Integer.parseInt(midData) > Integer.parseInt(v[1]); i++) {
                     finalFile = finalFile + line + "\n";
-                    v = line.split(",");
                     line = bufferedReader.readLine();
+                    if(line!=null)
+                    v = line.split(",");
                 }
-                if(i < sizeOfParent){
+                if(i < newSize){
                     finalFile = finalFile + i + "," + midData + "," + next + "\n";
                     i++;
                     for (; i <= newSize && line != null; i++) {
-                        v = line.split(",");
                         finalFile = finalFile + i + "," + v[1] + "," + v[2] + "\n";
                         line = bufferedReader.readLine();
+                        if(line!=null)
+                        v = line.split(",");
                     }
-                }else if(i==sizeOfParent+1){
+                }else {
                     finalFile = finalFile + i + "," + midData + "," + next + "\n";
-                }
+                }/*else{
+                    System.out.println("some error has occured:");
+                }*/
                 hdfs.delete(path, true);
                 hdfs.createNewFile(path);
                 StringBuilder sb = new StringBuilder();
@@ -382,9 +391,12 @@ public class FinalProject {
                 FSDataOutputStream fssOutStream = hdfs.create(path);
                 fssOutStream.write(bbyt);
                 fssOutStream.close();
-                currNode = parent;
+               // currNode = parent;
             } else {
-               splitTreeNode(midData,line,bufferedReader,v);
+                //current node is already set to this tree node, parent is set to it's parent and current size is size of this tree node..
+                //midData is midValue of it's child, line is firstLine of this node and bufferReader Points to zeroth line..
+                //next point to the pointer of child..
+               splitTreeNode(midData,line,bufferedReader);
             }
         }
     }
@@ -421,30 +433,37 @@ public class FinalProject {
         return;
     }
 
-    private static void splitTreeNode(String midData, String line, BufferedReader bufferedReader, String[] v) throws IOException {
+    private static void splitTreeNode(String midData, String line, BufferedReader bufferedReader) throws IOException {
 
+        //current node is already set to this tree node, parent is set to it's parent and current size is size of this tree node..
+        //midData is midValue of it's child, line is -1 line of this node and bufferReader Points to zeroth line..
+        //next point to the pointer of child..
+        String[] v;
         System.out.println("split Tree Node" + "," + currNode + "," + parent +"," +currentSize + "," + next);
         nodeCount++;
         String finalFile = "",secondFile = "";
         int maxSize = degreeOfTree - 1;
-        maxSize++;
-        String newMidData = "";
-        String firstPointerForSecondFile;
-        int splitlocation;
+        maxSize++;//for degree = 5, this value will be 5 and it's middle value will be propogated to top..
+        String newMidData = "";//this will be propogated to top...
+        String firstPointerForSecondFile;//zeroth line pointer for second file...first file has it already..
+        int splitlocation;//maxSize for degree 5 is 5 at this line..
+        //remember splitLocation is indexed from 1....
         if ((maxSize) % 2 == 0) {
             splitlocation = (maxSize) / 2;
         } else {
             splitlocation = ((maxSize) + 1) / 2;
         }
-        splitlocation++;//for 11 maxSize splitlocation should be 7 as splitLocation element should be in second file....
+       // splitlocation++;//for 11 maxSize splitlocation should be 7 as splitLocation element should be in second file....
         //TODO:cross check here....
         int sizeOfSecondTree = maxSize - splitlocation+1;// for 11 elements it should be 11-7 +1;
         int sizeOfFirstNode = splitlocation-1;
-        finalFile = "-1,0" + degreeOfTree +","+ sizeOfFirstNode +","+ parent;
+        finalFile = "-1,0," + degreeOfTree +","+ sizeOfFirstNode +","+ parent;
+
         line = bufferedReader.readLine();//zeroth line read here...
         finalFile = finalFile + line +"\n";//zeroth line is copied as it is...
         secondFile = secondFile + "-1,0,"+degreeOfTree +","+sizeOfSecondTree + ","+parent+"\n";
         line = bufferedReader.readLine();//first line read here....
+        v=line.split(",");
         int i;
         firstPointerForSecondFile = v[2];//it's right pointer of first line of first file...
         for (i = 1; i < splitlocation && line != null && Integer.parseInt(midData) > Integer.parseInt(v[1]); i++) {
@@ -455,48 +474,71 @@ public class FinalProject {
         }
         if(i < splitlocation){
             finalFile = finalFile + i + "," + midData + "," + next + "\n";
+            firstPointerForSecondFile = next;
             i++;
             for (; i < splitlocation && line != null; i++) {
-                v = line.split(",");
                 finalFile = finalFile + i + "," + v[1] + "," + v[2] + "\n";
                 firstPointerForSecondFile = v[2];
                 line = bufferedReader.readLine();
+                if(line!=null)
+                v = line.split(",");
             }
-            v= line.split(",");
             secondFile =secondFile + "0," + firstPointerForSecondFile + "\n";
             i++;
+            v= line.split(",");
             newMidData = (v[1]);
-            for (; i <= maxSize+1 && line!=null; i++) {
-                int lineNo = i - splitlocation;
-                v = line.split(",");
+            for (; i <= maxSize && line!=null; i++) {
+                int lineNo = i - splitlocation+1;
                 secondFile = secondFile + lineNo + "," + v[1]+"," + v[2]+ "\n";
                 line = bufferedReader.readLine();
+                if(line!=null)
+                    v = line.split(",");
             }
         } else{
             v = line.split(",");
             newMidData = (v[1]);
-            secondFile = "0," + firstPointerForSecondFile + "\n";
-            for (; (i < maxSize) && Integer.parseInt(midData) > Integer.parseInt(v[1]); i++) {
-                int lineNo = i - splitlocation;
-                v = line.split(",");
-                secondFile = secondFile + lineNo + "," + v[1] + "," + v[2] + "\n";
-                line = bufferedReader.readLine();
-            }
-            if (i < maxSize) {
-                secondFile = secondFile + i + "," + midData + "," + next + "\n";
-                i++;
+            secondFile = secondFile + "0," + firstPointerForSecondFile + "\n";
+            if(Integer.parseInt(midData) < Integer.parseInt(newMidData)){
+                    newMidData = midData;
+                    int lineNo = i-splitlocation+1;
+                    secondFile = secondFile + lineNo + "," + midData + "," + next + "\n";
+                    i++;
                 for (; i <= maxSize && line!=null; i++) {
-                    int lineNo = i - splitlocation;
+                    lineNo = i - splitlocation+1;
                     secondFile = secondFile + lineNo + "," + v[1] + "," + v[2] + "\n";
                     line = bufferedReader.readLine();
-                    v = line.split(",");
+                    if(line!=null)
+                        v = line.split(",");
                 }
-            } else {
-                int lineNo = i - splitlocation+1;
-                secondFile = secondFile + lineNo + "," + midData + "," + next + "\n";
-            }
-        }
 
+            }else{
+                    for (; (i < maxSize) && Integer.parseInt(midData) > Integer.parseInt(v[1]); i++) {
+                        int lineNo = i - splitlocation+1;
+                        secondFile = secondFile + lineNo + "," + v[1] + "," + v[2] + "\n";
+                        line = bufferedReader.readLine();
+                        if(line!=null)
+                        v = line.split(",");
+                    }
+                    if (i < maxSize) {
+                        int lineNo = i - splitlocation+1;
+                        secondFile = secondFile + lineNo + "," + midData + "," + next + "\n";
+                        i++;
+                        for (; i <= maxSize && line!=null; i++) {
+                           lineNo = i - splitlocation+1;
+                            secondFile = secondFile + lineNo + "," + v[1] + "," + v[2] + "\n";
+                            line = bufferedReader.readLine();
+                            if(line!=null)
+                            v = line.split(",");
+                        }
+                    } else {
+                        int lineNo = i - splitlocation+1;
+                        secondFile = secondFile + lineNo + "," + midData + "," + next + "\n";
+                    }
+
+            }
+
+        }
+        //next = String.valueOf(nodeCount);
         Path thisFile = new Path(newFolderPath + "/" + currNode + ".txt");
         hdfs.delete(thisFile, true);
         hdfs.createNewFile(thisFile);
