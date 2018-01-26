@@ -1,31 +1,16 @@
 package hadoopApp;
 
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.io.LongWritable;
-import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapred.FileInputFormat;
-import org.apache.hadoop.mapred.FileOutputFormat;
-import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapred.MapReduceBase;
-import org.apache.hadoop.mapred.Mapper;
-import org.apache.hadoop.mapred.OutputCollector;
-import org.apache.hadoop.mapred.Reducer;
-import org.apache.hadoop.mapred.Reporter;
-import org.apache.hadoop.mapred.TextInputFormat;
-import org.apache.hadoop.mapred.TextOutputFormat;
-import org.apache.hadoop.mapreduce.Job;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.Iterator;
 import java.util.Scanner;
+import java.util.Vector;
 
 
 public class FinalProject {
@@ -33,6 +18,7 @@ public class FinalProject {
     public static int degreeOfTree = 0;
     public static JobConf jobConf;
 
+    public static boolean isDebugMode = false;
     public static FileSystem hdfs;
     public static Path workingDir;
     public static Path newFolderPath;
@@ -49,17 +35,17 @@ public class FinalProject {
     public static int nodeCount=0;
 
     public static void main(String args[]) throws Exception {
-
         //first programme will start and welcome the user.....
         jobConf = new JobConf(FinalProject.class);
         hdfs = FileSystem.get(jobConf);
         workingDir = hdfs.getWorkingDirectory();
-        System.out.println("Entering into datavase.\nHello!!......................\n");
+        System.out.println("Entering into database.\nHello!!......................\n");
         System.out.println("Enter degree of tree:\n");
         Scanner reader = new Scanner(System.in);
         degreeOfTree = reader.nextInt();
         System.out.println("you've enetered: " + degreeOfTree);
         int numberofValues;
+        System.out.println("Enter number of times you'll give input: ");
         reader = new Scanner(System.in);
         numberofValues = reader.nextInt();
         for(int i=0;i<numberofValues;i++){
@@ -71,24 +57,92 @@ public class FinalProject {
             reader = new Scanner(System.in);
             dataToBeInserted = reader.next();
             insertIntoTree();
-            System.out.println("File:");
+            printTree();
+            printAllLeaf();
+        }
+        reader.close();
+    }
+
+    private static void printAllLeaf() throws IOException {
+
+        System.out.println("Printing all the leaves : ");
+        String nextPageAddress = "1";
+        String toPrint = "";
+        while (!nextPageAddress.equals("0")){
+            System.out.println("Page Address : " + nextPageAddress);
             hdfs = FileSystem.get(jobConf);
-            Path newFilePath = new Path(newFolderPath + "/" + root + ".txt");
+            Path newFilePath = new Path(newFolderPath + "/" + nextPageAddress + ".txt");
             BufferedReader bfr = new BufferedReader(new InputStreamReader(hdfs.open(newFilePath)));
             String str;
-            str = bfr.readLine();
-            while ( str!= null){
-                System.out.println(str);
+            str = bfr.readLine();//-1 line read here.......
+            String[] v = str.split(",");
+            nextPageAddress = v[5];
+            int size = Integer.parseInt(v[3]);
+            for (int j = 1;j<=size;j++){
                 str = bfr.readLine();
+                toPrint = toPrint  + str+ "\n";
             }
-        }
+            toPrint = toPrint + "\n";
 
-        reader.close();
+            System.out.println(toPrint);
+            toPrint = "";
+        }
+    }
+    private static void printTree() throws IOException {
+
+        int countOfLevel=0;
+        System.out.println("\nPrinting Tree in level order fashion: \n");
+        Vector<String> nodeList = new Vector<>();
+        //firstly the root page is inserted into stack....
+        nodeList.add(root);
+        //this boolean will be true only if we reach the leaf pages so that we can stop traversing further....
+        boolean done = false;
+        while (!done){
+            Vector<String> newList = new Vector<>();
+            String toPrint = "";
+            countOfLevel++;
+            System.out.println("Level : " + countOfLevel + "\n");
+            for (int i = 0; i <  nodeList.size() ; i++){
+                hdfs = FileSystem.get(jobConf);
+                Path newFilePath = new Path(newFolderPath + "/" + nodeList.elementAt(i) + ".txt");
+                BufferedReader bfr = new BufferedReader(new InputStreamReader(hdfs.open(newFilePath)));
+                String str;
+                str = bfr.readLine();//-1 line read here.......
+                String[] v = str.split(",");
+                toPrint = toPrint + "Page Address : " + nodeList.elementAt(i) + "\n";
+                if(v[1].equals("1")){
+                    done = true;
+                    int size = Integer.parseInt(v[3]);
+                    for (int j = 1;j<=size;j++){
+                        str = bfr.readLine();
+                        toPrint = toPrint  + str+ "\n";
+                    }
+                   toPrint = toPrint + "\n";
+                } else{
+                    int size = Integer.parseInt(v[3]);
+                    str = bfr.readLine();//zeroth ;line of tree node is read here...
+                    toPrint = toPrint  + str+ "\n";//zeroth line is added to printString...
+                    v=str.split(",");
+                    newList.add(v[1]);//pointer to its file is aded in node list here..
+                    //this loop will traverse through each line of file and put lines to printString and also push pointer of its child to newList.
+                    for (int j = 1;j<=size;j++){
+                        str = bfr.readLine();
+                        toPrint = toPrint  + str + "\n";
+                        v=str.split(",");
+                        newList.add(v[2]);
+                    }
+                    toPrint = toPrint + "\n";
+                }
+            }
+            System.out.println(toPrint);
+            nodeList = newList;
+        }
     }
 
     private static void insertIntoTree() throws IOException {
         if (root.equals("0")) {
             createTree();
+            if(isDebugMode)
             System.out.println("created tree...." + currNode + "," + parent +"," +currentSize + "," + next);
         }
         hdfs = FileSystem.get(jobConf);
@@ -111,6 +165,7 @@ public class FinalProject {
     private static void insertIntoNonLeafNode(BufferedReader bfr) throws IOException {
         int i;
         String line = bfr.readLine();//zeroth line is rea here....
+        if(isDebugMode)
         System.out.println("inserting into non leaf node line 114 : currentNode, root : " +currNode+ ", "+root );
         String[] v =line.split(",");
         String leftPointer = v[1];//leftest pointer..
@@ -146,9 +201,11 @@ public class FinalProject {
 
     private static void insertIntoLeafNode(BufferedReader bfr) throws IOException {
 
+        if(isDebugMode)
         System.out.println("inside insert into LeafNode...." + currNode + "," + parent +"," +currentSize + "," + next);
 
         if (Integer.parseInt(currentSize) < degreeOfTree - 1 && Integer.parseInt(currentSize)!=0) {
+            if(isDebugMode)
             System.out.println("currentSize < degree" + currNode + "," + parent +"," +currentSize + "," + next);
             String finalFile = "";
             int currSize = Integer.parseInt(currentSize)+1;
@@ -220,16 +277,19 @@ public class FinalProject {
         Path path;
         int sizeOfSecondTree = 0;
         sizeOfSecondTree = maxSize - splitlocation;
+        if(isDebugMode)
         System.out.println("split leaf....split location,size of second tree = "+splitlocation +","+sizeOfSecondTree+","+ currNode + "," + parent +"," +currentSize + "," + next);
 
         String finalFile = "";
         String secondfFile = "-1,1," + degreeOfTree + "," + sizeOfSecondTree + "," + FinalProject.parent +","+ FinalProject.next + "\n";
         if (!next.equals("0")) {
+            if(isDebugMode)
             System.out.println("split leaf nex ! = 0...." + currNode + "," + parent +"," +currentSize + "," + next);
             path = new Path(newFolderPath + "/" + nodeCount + ".txt");
             finalFile = "" + -1 + "," + 1 + "," + degreeOfTree +","+ splitlocation + "," + parent + "," + nodeCount + "\n";
             next = "" + nodeCount;
         } else {
+            if(isDebugMode)
             System.out.println("split leaf nex = = 0...." + currNode + "," + parent +"," +currentSize + "," + next);
             finalFile = "" + -1 + "," + 1 + "," + degreeOfTree +","+ splitlocation + "," + parent + "," + nodeCount + "\n";
             path = new Path(newFolderPath + "/" + nodeCount + ".txt");
@@ -316,16 +376,20 @@ public class FinalProject {
 
     private static void propogate(String midData) throws IOException {
 
+        if(isDebugMode)
         System.out.println("propogate....midData="+midData + "," + currNode + "," + parent +"," +currentSize + "," + next);
 
         if (parent.equals("0")) {//if parent is not present....create a new tree node and set it as root
+            if(isDebugMode)
             System.out.println("propogate..creating parent..midData="+midData + "," + currNode + "," + parent +"," +currentSize + "," + next);
             nodeCount++;
             Path path = new Path(newFolderPath + "/" + nodeCount + ".txt");
+            if(isDebugMode)
             System.out.println("propogate..creating parent..midData,currentNode,parent,currentSize,next,path="+midData + "," + currNode + "," + parent +"," +currentSize + "," + next + "," + path.toString());
             changeParentTo(nodeCount,currNode);
             changeParentTo(nodeCount,next);
             root = "" + nodeCount;
+            if(isDebugMode)
             System.out.println("root changed to : " + root);
 
             parent = "0";
@@ -343,6 +407,7 @@ public class FinalProject {
             fssOutStream.close();
             return;
         } else {
+            if(isDebugMode)
             System.out.println("propogate...parent already present.midData="+midData + "," + currNode + "," + parent +"," +currentSize + "," + next);
             Path path = new Path(newFolderPath + "/" + parent + ".txt");
             BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(hdfs.open(path)));
@@ -353,6 +418,7 @@ public class FinalProject {
             parent = v[4];
             currentSize = String.valueOf(sizeOfParent);
             if (sizeOfParent < degreeOfTree-1) {
+                if(isDebugMode)
                 System.out.println("propogate...sizeOfPArent < degree.midData="+midData + "," + currNode + "," + parent +"," +currentSize + "," + next);
 
                 String finalFile = "";
@@ -419,7 +485,9 @@ public class FinalProject {
             finalFile = finalFile + str + "\n";
             str = bfr.readLine();
         }
+        if(isDebugMode)
         System.out.println("finalFile parent changed for child :" + currNodee+ " ,to " +nodeCount );
+        if(isDebugMode)
         System.out.println("finalFile is :\n" + finalFile);
         hdfs.delete(newFilePath, true);
         hdfs.createNewFile(newFilePath);
@@ -439,6 +507,7 @@ public class FinalProject {
         //midData is midValue of it's child, line is -1 line of this node and bufferReader Points to zeroth line..
         //next point to the pointer of child..
         String[] v;
+        if(isDebugMode)
         System.out.println("split Tree Node" + "," + currNode + "," + parent +"," +currentSize + "," + next);
         nodeCount++;
         String finalFile = "",secondFile = "";
@@ -453,7 +522,7 @@ public class FinalProject {
         } else {
             splitlocation = ((maxSize) + 1) / 2;
         }
-
+        splitlocation++;
         //TODO:cross check here....
         int sizeOfSecondTree = maxSize - splitlocation+1;// for 11 elements it should be 11-7 +1;
         int sizeOfFirstNode = splitlocation-1;
@@ -568,6 +637,7 @@ public class FinalProject {
 
 
     private static void createTree() throws IOException {
+        if(isDebugMode)
         System.out.println("inside create tree" + "," + currNode + "," + parent +"," +currentSize + "," + next);
         nodeCount++;
         jobConf = new JobConf(FinalProject.class);
@@ -585,6 +655,7 @@ public class FinalProject {
         FSDataOutputStream fsOutStream = hdfs.create(newFilePath);
         fsOutStream.write(byt);
         fsOutStream.close();
+        if(isDebugMode)
         System.out.println("Root node created.");
         root = String.valueOf(nodeCount);
         currNode = root;
